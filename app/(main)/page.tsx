@@ -27,7 +27,12 @@ export default function Home() {
   const { setStreamPromise } = use(Context);
   const router = useRouter();
 
-  const [models, setModels] = useState([]);
+  interface Model {
+    label: string;
+    value: string;
+  }
+
+  const [models, setModels] = useState<Model[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -37,8 +42,13 @@ export default function Home() {
   }, []);
 
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(models[0]?.value || "");
-  const selectedModel = models.find(m => m.value === model) || models[0]?.value;
+  const [model, setModel] = useState("");
+  useEffect(() => {
+    if (models.length > 0 && !model) {
+      setModel(models[0].value);
+    }
+  }, [models, model]);
+  const selectedModel = models.find(m => m.value === model) || models[0];
   const [quality, setQuality] = useState("high");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
     undefined,
@@ -183,8 +193,8 @@ export default function Home() {
                       onValueChange={setModel}
                     >
                       <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300">
-                        <Select.Value aria-label={selectedModel}>
-                          <span>{selectedModel?.label}</span>
+                        <Select.Value aria-label={selectedModel?.label || ''}>
+                          <span>{selectedModel?.label || 'Select model'}</span>
                         </Select.Value>
                         <Select.Icon>
                           <ChevronDownIcon className="size-3" />
