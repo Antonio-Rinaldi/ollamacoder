@@ -2,13 +2,22 @@
 
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import Together from "together-ai";
 import { z } from "zod";
-import {
-  getMainCodingPrompt,
-  screenshotToCodePrompt,
-  softwareArchitectPrompt,
-} from "@/lib/prompts";
+import { getMainCodingPrompt, screenshotToCodePrompt, softwareArchitectPrompt } from "@/lib/prompts";
+
+// TODO: fix
+const SERVER_BASE_URL = "http://localhost:3000";
+
+export async function fetchModels() {
+  const res = await fetch(`${SERVER_BASE_URL}/api/fetchModels`, {
+    method: "GET",
+  });
+  const jsonRes = await res.json();
+  return jsonRes.models.map(model => ({
+    label: model.name,
+    value: model.model
+  }));
+}
 
 export async function createChat(
   prompt: string,
@@ -16,114 +25,92 @@ export async function createChat(
   quality: "high" | "low",
   screenshotUrl: string | undefined,
 ) {
-  let options: ConstructorParameters<typeof Together>[0] = {};
-  if (process.env.HELICONE_API_KEY) {
-    options.baseURL = "https://together.helicone.ai/v1";
-    options.defaultHeaders = {
-      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-      "Helicone-Property-appname": "LlamaCoder",
-    };
-  }
-
-  const together = new Together(options);
 
   async function fetchTitle() {
-    const responseForChatTitle = await together.chat.completions.create({
-      model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a chatbot helping the user create a simple app or script, and your current job is to create a succinct title, maximum 3-5 words, for the chat given their initial prompt. Please return only the title.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+    const title = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a chatbot helping the user create a simple app or script, and your current job is to create a succinct title, maximum 3-5 words, for the chat given their initial prompt. Please return only the title.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      }),
     });
-    const title = responseForChatTitle.choices[0].message?.content || prompt;
-    return title;
+    return await processResponse(title) || prompt;
   }
 
-  async function fetchTopExample() {
-    const findSimilarExamples = await together.chat.completions.create({
-      model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-      messages: [
-        {
-          role: "system",
-          content: `You are a helpful bot. Given a request for building an app, you match it to the most similar example provided. If the request is NOT similar to any of the provided examples, return "none". Here is the list of examples, ONLY reply with one of them OR "none":
-
-          - landing page
-          - blog app
-          - quiz app
-          - pomodoro timer
-          `,
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
-
-    const mostSimilarExample =
-      findSimilarExamples.choices[0].message?.content || "none";
-    return mostSimilarExample;
-  }
-
-  const [title, mostSimilarExample] = await Promise.all([
+  const [title] = await Promise.all([
     fetchTitle(),
-    fetchTopExample(),
   ]);
 
-  let fullScreenshotDescription;
+  let fullScreenshotDescription: string;
   if (screenshotUrl) {
-    const screenshotResponse = await together.chat.completions.create({
-      model: "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
-      temperature: 0.2,
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "user",
-          // @ts-expect-error Need to fix the TypeScript library type
-          content: [
-            { type: "text", text: screenshotToCodePrompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: screenshotUrl,
+    let screenshotResponse = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 1000,
+        messages: [
+          {
+            role: "user",
+            // @ts-expect-error Need to fix the TypeScript library type
+            content: [
+              { type: "text", text: screenshotToCodePrompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: screenshotUrl,
+                },
               },
-            },
-          ],
-        },
-      ],
+            ],
+          },
+        ],
+      }),
     });
-
-    fullScreenshotDescription = screenshotResponse.choices[0].message?.content;
+    fullScreenshotDescription = await processResponse(screenshotResponse);
   }
 
   let userMessage: string;
   if (quality === "high") {
-    let initialRes = await together.chat.completions.create({
-      model: "Qwen/Qwen2.5-Coder-32B-Instruct",
-      messages: [
-        {
-          role: "system",
-          content: softwareArchitectPrompt,
-        },
-        {
-          role: "user",
-          content: fullScreenshotDescription
-            ? fullScreenshotDescription + prompt
-            : prompt,
-        },
-      ],
-      temperature: 0.2,
-      max_tokens: 3000,
+    const initialRes = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 3000,
+        messages: [
+          {
+            role: "system",
+            content: softwareArchitectPrompt,
+          },
+          {
+            role: "user",
+            content: fullScreenshotDescription
+              ? fullScreenshotDescription + prompt
+              : prompt,
+          },
+        ],
+      }),
     });
-
-    userMessage = initialRes.choices[0].message?.content ?? prompt;
+    userMessage = await processResponse(initialRes) ?? prompt;
   } else {
     userMessage =
       prompt +
@@ -143,7 +130,7 @@ export async function createChat(
           data: [
             {
               role: "system",
-              content: getMainCodingPrompt(mostSimilarExample),
+              content: getMainCodingPrompt(),
               position: 0,
             },
             { role: "user", content: userMessage, position: 1 },
@@ -162,7 +149,7 @@ export async function createChat(
   if (!lastMessage) throw new Error("No new message");
 
   return {
-    chatId: chat.id,
+    chatId: chat['id'],
     lastMessageId: lastMessage.id,
   };
 }
@@ -178,9 +165,8 @@ export async function createMessage(
   });
   if (!chat) notFound();
 
-  const maxPosition = Math.max(...chat.messages.map((m) => m.position));
-
-  const newMessage = await prisma.message.create({
+  const maxPosition = Math.max(...chat.messages.map(message => message.position));
+  return prisma.message.create({
     data: {
       role,
       content: text,
@@ -188,8 +174,6 @@ export async function createMessage(
       chatId,
     },
   });
-
-  return newMessage;
 }
 
 export async function getNextCompletionStreamPromise(
@@ -200,7 +184,7 @@ export async function getNextCompletionStreamPromise(
   if (!message) notFound();
 
   const messagesRes = await prisma.message.findMany({
-    where: { chatId: message.chatId, position: { lte: message.position } },
+    where: { chatId: message['chatId'], position: { lte: message['position'] } },
     orderBy: { position: "asc" },
   });
 
@@ -213,29 +197,52 @@ export async function getNextCompletionStreamPromise(
     )
     .parse(messagesRes);
 
-  let options: ConstructorParameters<typeof Together>[0] = {};
-  if (process.env.HELICONE_API_KEY) {
-    options.baseURL = "https://together.helicone.ai/v1";
-    options.defaultHeaders = {
-      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-      "Helicone-Property-appname": "LlamaCoder",
-      "Helicone-Property-chatId": message.chatId,
-    };
-  }
-
-  const together = new Together(options);
-
   return {
-    streamPromise: new Promise<ReadableStream>(async (resolve) => {
-      const res = await together.chat.completions.create({
-        model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        stream: true,
-        temperature: 0.2,
-        max_tokens: 9000,
+    streamPromise: new Promise<ReadableStream>(async resolve => {
+      const res = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: messages.map(message => ({
+            role: message.role,
+            content: message.content
+          })),
+        }),
       });
-
-      resolve(res.toReadableStream());
+      resolve(res.body as ReadableStream);
     }),
   };
+}
+
+async function processResponse(res: Response) {
+  if (!res.ok) {
+    throw new Error(res.statusText);
+  }
+
+  if (!res.body) {
+    throw new Error("No response body");
+  }
+
+  const reader = res.body.getReader();
+  let receivedData = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const receivedLines = new TextDecoder().decode(value);
+    receivedLines.split("\n")
+      .filter(receivedLines => receivedLines.length > 0)
+      .forEach(receivedLine => {
+        receivedData += JSON.parse(receivedLine).response;
+      });
+    return removeCodeFormatting(receivedData);
+  }
+}
+
+function removeCodeFormatting(code: string): string {
+  return code.replace(/```(?:typescript|javascript|tsx)?\n([\s\S]*?)```/g, '$1').trim();
 }

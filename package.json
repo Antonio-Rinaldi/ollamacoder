@@ -1,5 +1,5 @@
 {
-  "name": "llamacoder-new",
+  "name": "ollamacoder-new",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -39,7 +39,7 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "together-ai": "^0.10.0",
+    "together-ai": "^0.11.1",
     "use-stick-to-bottom": "^1.0.42",
     "vaul": "^1.1.2",
     "zod": "^3.24.1"

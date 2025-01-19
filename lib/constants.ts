@@ -1,22 +1,3 @@
-export const MODELS = [
-  {
-    label: "Qwen 2.5 Coder 32B",
-    value: "Qwen/Qwen2.5-Coder-32B-Instruct",
-  },
-  {
-    label: "Llama 3.1 405B",
-    value: "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
-  },
-  {
-    label: "Llama 3.3 70B",
-    value: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-  },
-  {
-    label: "DeepSeek V3",
-    value: "deepseek-ai/DeepSeek-V3",
-  },
-];
-
 export const SUGGESTED_PROMPTS = [
   {
     title: "Quiz app",

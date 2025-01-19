@@ -13,28 +13,37 @@ import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useState, useRef, useTransition } from "react";
+import { use, useState, useRef, useTransition, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { createChat, getNextCompletionStreamPromise } from "./actions";
+import { fetchModels, createChat, getNextCompletionStreamPromise } from "./actions";
 import { Context } from "./providers";
 import Header from "@/components/header";
 import { useS3Upload } from "next-s3-upload";
 import UploadIcon from "@/components/icons/upload-icon";
 import { XCircleIcon } from "@heroicons/react/20/solid";
-import { MODELS, SUGGESTED_PROMPTS } from "@/lib/constants";
+import { SUGGESTED_PROMPTS } from "@/lib/constants";
 
 export default function Home() {
   const { setStreamPromise } = use(Context);
   const router = useRouter();
 
+  const [models, setModels] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      const models = await fetchModels()
+      setModels(models)
+    })();
+  }, []);
+
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(MODELS[0].value);
+  const [model, setModel] = useState(models[0]?.value || "");
+  const selectedModel = models.find(m => m.value === model) || models[0]?.value;
   const [quality, setQuality] = useState("high");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(
     undefined,
   );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
-  const selectedModel = MODELS.find((m) => m.value === model);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isPending, startTransition] = useTransition();
@@ -67,13 +76,13 @@ export default function Home() {
         <div className="mt-10 flex grow flex-col items-center px-4 lg:mt-16">
           <a
             className="mb-4 inline-flex shrink-0 items-center rounded-full border-[0.5px] bg-white px-7 py-2 text-xs text-gray-800 shadow-[0px_1px_1px_0px_rgba(0,0,0,0.25)] md:text-base"
-            href="https://dub.sh/together-ai/?utm_source=example-app&utm_medium=llamacoder&utm_campaign=llamacoder-app-signup"
+            href="https://ollama.com"
             target="_blank"
           >
             <span className="text-center">
-              Powered by <span className="font-semibold">Together AI</span>.
+              Powered by <span className="font-semibold">Ollama</span>.
               Used by
-              <span className="font-semibold"> 600k+ users. </span>
+              <span className="font-semibold"> some unlucky guy. </span>
             </span>
           </a>
 
@@ -85,7 +94,7 @@ export default function Home() {
 
           <form
             className="relative pt-6 lg:pt-12"
-            action={async (formData) => {
+            action={async formData => {
               startTransition(async () => {
                 const { prompt, model, quality } = Object.fromEntries(formData);
 
@@ -174,7 +183,7 @@ export default function Home() {
                       onValueChange={setModel}
                     >
                       <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300">
-                        <Select.Value aria-label={model}>
+                        <Select.Value aria-label={selectedModel}>
                           <span>{selectedModel?.label}</span>
                         </Select.Value>
                         <Select.Icon>
@@ -184,7 +193,7 @@ export default function Home() {
                       <Select.Portal>
                         <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/5">
                           <Select.Viewport className="space-y-1 p-2">
-                            {MODELS.map((m) => (
+                            {models.map(m => (
                               <Select.Item
                                 key={m.value}
                                 value={m.value}
@@ -321,17 +330,10 @@ export default function Home() {
             <div className="font-medium">
               Built with{" "}
               <a
-                href="https://dub.sh/together-ai/?utm_source=example-app&utm_medium=llamacoder&utm_campaign=llamacoder-app-signup"
+                href="https://ollama.com"
                 className="font-semibold text-blue-600 underline-offset-4 transition hover:text-gray-700 hover:underline"
               >
-                Llama 3.1
-              </a>{" "}
-              and{" "}
-              <a
-                href="https://dub.sh/together-ai/?utm_source=example-app&utm_medium=llamacoder&utm_campaign=llamacoder-app-signup"
-                className="font-semibold text-blue-600 underline-offset-4 transition hover:text-gray-700 hover:underline"
-              >
-                Together AI
+                Ollama
               </a>
               .
             </div>
@@ -350,7 +352,7 @@ export default function Home() {
               </svg>
             </Link>
             <Link
-              href="https://github.com/Nutlope/llamacoder"
+              href="https://github.com/Antonio-Rinaldi/ollamacoder"
               className="group"
               aria-label=""
             >

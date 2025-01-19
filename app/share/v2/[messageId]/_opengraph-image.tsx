@@ -32,8 +32,8 @@ export default async function Image({
   const backgroundSrc = Uint8Array.from(backgroundData).buffer;
 
   let title = message
-    ? message.chat.title
-    : "An app generated on LlamaCoder.io";
+    ? message.chat['title']
+    : "An app generated on OllamaCoder.io";
 
   return new ImageResponse(
     (

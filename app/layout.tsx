@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import PlausibleProvider from "next-plausible";
 import "./globals.css";
 
-let title = "Llama Coder – AI Code Generator";
-let description = "Generate your next app with Llama 3.1 405B";
-let url = "https://llamacoder.io/";
+let title = "Ollama Coder – AI Code Generator";
+let description = "Generate your next app with Ollama";
+let url = "https://ollamacoder.io/";
 let ogimage = "https://llamacoder.io/og-image.png";
-let sitename = "llamacoder.io";
+let sitename = "ollamacoder.io";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
@@ -38,12 +38,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full bg-gray-100">
       <head>
-        <PlausibleProvider domain="llamacoder.io" />
+        <PlausibleProvider domain="ollamacoder.io" />
       </head>
-
-      {children}
+      <body className="h-full antialiased">
+        {children}
+      </body>
     </html>
   );
 }

@@ -11,7 +11,7 @@ To run the repo locally, simply `npm install` to install dependencies and then `
 ## Roadmap
 
 - [ ] Add self-correcting to the app so it can fix its own errors
-- [ ] Compressing prompt: Use small model like llama 3.1 70B to retain what happened in the past, good memory management is key
+- [ ] Compressing prompt: Use small model like ollama 3.1 70B to retain what happened in the past, good memory management is key
 - [ ] Add evals with Braintrust to be able to measure how good the system is over time and when making new changes
 - [ ] Add more good examples to the shadcn-examples.ts file (single components that span a whole app and use shadcn)
 - [ ] Add dynamic OG images to the specific generations & include the prompt + a screenshot in the image

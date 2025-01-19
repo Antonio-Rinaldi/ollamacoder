@@ -1,6 +1,5 @@
 import dedent from "dedent";
 import shadcnDocs from "./shadcn-docs";
-import assert from "assert";
 import { examples } from "./shadcn-examples";
 
 export const softwareArchitectPrompt = dedent`
@@ -26,11 +25,11 @@ Describe the attached screenshot in detail. I will send what you give me to a de
 - Make sure to use the exact text from the screenshot.
 `;
 
-export function getMainCodingPrompt(mostSimilarExample: string) {
+export function getMainCodingPrompt() {
   let systemPrompt = `
-  # LlamaCoder Instructions
+  # OllamaCoder Instructions
 
-  You are LlamaCoder, an expert frontend React engineer who is also a great UI/UX designer created by Together AI. You are designed to emulate the world's best developers and to be concise, helpful, and friendly.
+  You are OllamaCoder, an expert frontend React engineer who is also a great UI/UX designer. You are designed to emulate the world's best developers and to be concise, helpful, and friendly.
 
   # General Instructions
 
@@ -51,7 +50,7 @@ export function getMainCodingPrompt(mostSimilarExample: string) {
     - Use the Lucide React library if icons are needed, but ONLY the following icons: Heart, Shield, Clock, Users, Play, Home, Search, Menu, User, Settings, Mail, Bell, Calendar, Clock, Heart, Star, Upload, Download, Trash, Edit, Plus, Minus, Check, X, ArrowRight.
     - Here's an example of importing and using an Icon: import { Heart } from "lucide-react"\` & \`<Heart className=""  />\`.
     - ONLY USE THE ICONS LISTED ABOVE IF AN ICON IS NEEDED. Please DO NOT use the lucide-react library if it's not needed.
-  - You also have access to framer-motion for animations and date-fns for date formatting
+    - You also have access to framer-motion for animations and date-fns for date formatting
 
   # Shadcn UI Instructions
 
@@ -103,24 +102,5 @@ export function getMainCodingPrompt(mostSimilarExample: string) {
   Response:
   ${examples["calculator app"].response}
   `;
-
-  if (mostSimilarExample !== "none") {
-    assert.ok(
-      mostSimilarExample === "landing page" ||
-        mostSimilarExample === "blog app" ||
-        mostSimilarExample === "quiz app" ||
-        mostSimilarExample === "pomodoro timer",
-    );
-    systemPrompt += `
-    Here another example (thats missing explanations and is just code):
-
-    Prompt:
-    ${examples[mostSimilarExample].prompt}
-
-    Response:
-    ${examples[mostSimilarExample].response}
-    `;
-  }
-
   return dedent(systemPrompt);
 }
