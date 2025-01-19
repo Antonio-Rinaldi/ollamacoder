@@ -1,19 +1,34 @@
 "use server";
 
 import prisma from "@/lib/prisma";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getMainCodingPrompt, screenshotToCodePrompt, softwareArchitectPrompt } from "@/lib/prompts";
 
-// TODO: fix
-const SERVER_BASE_URL = "http://localhost:3000";
+function getBaseUrl() {
+  // During SSR, use the host header to create the base URL
+  if (typeof window === 'undefined') {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    // Cast to Headers since we know it's synchronous despite the type
+    const headersList = headers() as unknown as Headers;
+    const host = headersList.get('host');
+    if (!host) {
+      // Fallback to environment variable or default
+      return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    }
+    return `${protocol}://${host}`;
+  }
+  // In the browser, use the current window location
+  return window.location.origin;
+}
 
 export async function fetchModels() {
-  const res = await fetch(`${SERVER_BASE_URL}/api/fetchModels`, {
+  const res = await fetch(`${getBaseUrl()}/api/fetchModels`, {
     method: "GET",
   });
   const jsonRes = await res.json();
-  return jsonRes.models.map(model => ({
+  return jsonRes.models.map((model: { name: string; model: string }) => ({
     label: model.name,
     value: model.model
   }));
@@ -27,7 +42,7 @@ export async function createChat(
 ) {
 
   async function fetchTitle() {
-    const title = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+    const title = await fetch(`${getBaseUrl()}/api/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -38,7 +53,7 @@ export async function createChat(
           {
             role: "system",
             content:
-              "You are a chatbot helping the user create a simple app or script, and your current job is to create a succinct title, maximum 3-5 words, for the chat given their initial prompt. Please return only the title.",
+              "You are a naming expert helping to create descriptive and meaningful titles for software projects. Your task is to analyze the user's prompt and create a clear, concise title that captures the essence of what they want to build. The title should be descriptive enough to understand the project's purpose but still concise (under 60 characters). Focus on the main functionality or purpose. Return only the title, with no quotes or additional text.",
           },
           {
             role: "user",
@@ -54,9 +69,9 @@ export async function createChat(
     fetchTitle(),
   ]);
 
-  let fullScreenshotDescription: string;
+  let fullScreenshotDescription: string | undefined;
   if (screenshotUrl) {
-    let screenshotResponse = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+    const screenshotResponse = await fetch(`${getBaseUrl()}/api/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -68,7 +83,6 @@ export async function createChat(
         messages: [
           {
             role: "user",
-            // @ts-expect-error Need to fix the TypeScript library type
             content: [
               { type: "text", text: screenshotToCodePrompt },
               {
@@ -87,7 +101,7 @@ export async function createChat(
 
   let userMessage: string;
   if (quality === "high") {
-    const initialRes = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+    const initialRes = await fetch(`${getBaseUrl()}/api/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -114,8 +128,7 @@ export async function createChat(
   } else {
     userMessage =
       prompt +
-      "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " +
-      fullScreenshotDescription;
+      (fullScreenshotDescription ? "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " + fullScreenshotDescription : "");
   }
 
   const chat = await prisma.chat.create({
@@ -199,7 +212,7 @@ export async function getNextCompletionStreamPromise(
 
   return {
     streamPromise: new Promise<ReadableStream>(async resolve => {
-      const res = await fetch(`${SERVER_BASE_URL}/api/generate`, {
+      const res = await fetch(`${getBaseUrl()}/api/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
