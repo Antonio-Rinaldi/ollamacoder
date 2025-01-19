@@ -38,12 +38,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-gray-100">
+    <html lang="en" className="h-full antialiased bg-gray-100">
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <PlausibleProvider domain="ollamacoder.io" />
       </head>
-      <body className="h-full antialiased">
-        {children}
+      <body className="text-base">
+        <main className="flex min-h-full w-full flex-col text-gray-900">
+          {children}
+        </main>
       </body>
     </html>
   );

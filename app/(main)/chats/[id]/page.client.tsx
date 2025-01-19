@@ -6,7 +6,7 @@ import { splitByFirstCodeFence } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, use, useEffect, useRef, useState } from "react";
-import { ChatCompletionStream } from "together-ai/lib/ChatCompletionStream.mjs";
+import { OllamaStream } from "@/lib/ollama-stream";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
 import CodeViewer from "./code-viewer";
@@ -41,8 +41,8 @@ export default function PageClient({ chat }: { chat: Chat }) {
       let didPushToCode = false;
       let didPushToPreview = false;
 
-      ChatCompletionStream.fromReadableStream(stream)
-        .on("content", (delta, content) => {
+      OllamaStream.fromReadableStream(stream)
+        .on("content", (delta: string, content: string) => {
           setStreamText((text) => text + delta);
 
           if (
@@ -67,7 +67,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
             setActiveTab("preview");
           }
         })
-        .on("finalContent", async (finalText) => {
+        .on("finalContent", async (finalText: string) => {
           startTransition(async () => {
             const message = await createMessage(
               chat.id,
