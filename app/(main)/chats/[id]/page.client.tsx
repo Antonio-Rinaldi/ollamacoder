@@ -6,7 +6,7 @@ import { splitByFirstCodeFence } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, use, useEffect, useRef, useState } from "react";
-import { OllamaStream } from "@/lib/ollama-stream";
+import { ChatStream } from "@/lib/chat-stream";
 import ChatBox from "./chat-box";
 import ChatLog from "./chat-log";
 import CodeViewer from "./code-viewer";
@@ -21,17 +21,18 @@ export default function PageClient({ chat }: { chat: Chat }) {
   >(context.streamPromise);
   const [streamText, setStreamText] = useState("");
   const [isShowingCodeViewer, setIsShowingCodeViewer] = useState(
-    chat.messages.some((m) => m.role === "assistant"),
+    chat['messages'].some(message => message.role === "assistant") as boolean,
   );
   const [activeTab, setActiveTab] = useState<"code" | "preview">("preview");
   const router = useRouter();
   const isHandlingStreamRef = useRef(false);
   const [activeMessage, setActiveMessage] = useState(
-    chat.messages.filter((m) => m.role === "assistant").at(-1),
+    chat['messages'].filter(message => message.role === "assistant").at(-1),
   );
 
+  const chatId = chat['id'];
   useEffect(() => {
-    async function f() {
+    (async () => {
       if (!streamPromise || isHandlingStreamRef.current) return;
 
       isHandlingStreamRef.current = true;
@@ -41,7 +42,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
       let didPushToCode = false;
       let didPushToPreview = false;
 
-      OllamaStream.fromReadableStream(stream)
+      return ChatStream.fromReadableStream(stream)
         .on("content", (delta: string, content: string) => {
           setStreamText((text) => text + delta);
 
@@ -70,7 +71,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
         .on("finalContent", async (finalText: string) => {
           startTransition(async () => {
             const message = await createMessage(
-              chat.id,
+              chatId,
               finalText,
               "assistant",
             );
@@ -83,11 +84,10 @@ export default function PageClient({ chat }: { chat: Chat }) {
               router.refresh();
             });
           });
-        });
-    }
-
-    f();
-  }, [chat.id, router, streamPromise, context]);
+        })
+        .read();
+    })();
+  }, [chatId, router, streamPromise, context]);
 
   return (
     <div className="h-dvh">
@@ -97,7 +97,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
             <Link href="/">
               <LogoSmall />
             </Link>
-            <p className="italic text-gray-500">{chat.title}</p>
+            <p className="italic text-gray-500">{chat['title']}</p>
           </div>
 
           <ChatLog

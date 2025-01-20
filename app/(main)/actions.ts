@@ -6,25 +6,8 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getMainCodingPrompt, screenshotToCodePrompt, softwareArchitectPrompt } from "@/lib/prompts";
 
-function getBaseUrl() {
-  // During SSR, use the host header to create the base URL
-  if (typeof window === 'undefined') {
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    // Cast to Headers since we know it's synchronous despite the type
-    const headersList = headers() as unknown as Headers;
-    const host = headersList.get('host');
-    if (!host) {
-      // Fallback to environment variable or default
-      return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    }
-    return `${protocol}://${host}`;
-  }
-  // In the browser, use the current window location
-  return window.location.origin;
-}
-
 export async function fetchModels() {
-  const res = await fetch(`${getBaseUrl()}/api/fetchModels`, {
+  const res = await fetch(await getApiFetchModelsUrl(), {
     method: "GET",
   });
   const jsonRes = await res.json();
@@ -42,7 +25,7 @@ export async function createChat(
 ) {
 
   async function fetchTitle() {
-    const title = await fetch(`${getBaseUrl()}/api/generate`, {
+    const title = await fetch(await getApiGenerateUrl() , {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -71,7 +54,7 @@ export async function createChat(
 
   let fullScreenshotDescription: string | undefined;
   if (screenshotUrl) {
-    const screenshotResponse = await fetch(`${getBaseUrl()}/api/generate`, {
+    const screenshotResponse = await fetch(await getApiGenerateUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -101,7 +84,7 @@ export async function createChat(
 
   let userMessage: string;
   if (quality === "high") {
-    const initialRes = await fetch(`${getBaseUrl()}/api/generate`, {
+    const initialRes = await fetch(await getApiGenerateUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -198,7 +181,7 @@ export async function getNextCompletionStreamPromise(
 
   const messagesRes = await prisma.message.findMany({
     where: { chatId: message['chatId'], position: { lte: message['position'] } },
-    orderBy: { position: "asc" },
+    orderBy: { position: "asc" }
   });
 
   const messages = z
@@ -211,32 +194,37 @@ export async function getNextCompletionStreamPromise(
     .parse(messagesRes);
 
   return {
-    streamPromise: new Promise<ReadableStream>(async resolve => {
-      const res = await fetch(`${getBaseUrl()}/api/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: messages.map(message => ({
-            role: message.role,
-            content: message.content
-          })),
-        }),
-      });
-      resolve(res.body as ReadableStream);
+    streamPromise: new Promise<ReadableStream>(async (resolve, reject) => {
+      try {
+        const res = await fetch(await getApiGenerateUrl(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: messages.map(message => ({
+              role: message.role,
+              content: message.content
+            })),
+          }),
+        });
+        resolve(res);
+      } catch (error) {
+        console.log(error)
+        reject(error);
+      }
     }),
   };
 }
 
 async function processResponse(res: Response) {
   if (!res.ok) {
-    throw new Error(res.statusText);
+    throw Error(res.statusText);
   }
 
   if (!res.body) {
-    throw new Error("No response body");
+    throw Error("No response body");
   }
 
   const reader = res.body.getReader();
@@ -246,16 +234,50 @@ async function processResponse(res: Response) {
     if (done) {
       break;
     }
-    const receivedLines = new TextDecoder().decode(value);
-    receivedLines.split("\n")
-      .filter(receivedLines => receivedLines.length > 0)
-      .forEach(receivedLine => {
-        receivedData += JSON.parse(receivedLine).response;
-      });
-    return removeCodeFormatting(receivedData);
+    const receivedText = new TextDecoder().decode(value);
+    if (receivedText.includes("\n")) {
+      receivedText.split("\n")
+        .forEach(receivedLine => {
+          if (receivedLine.startsWith("{") && receivedLine.endsWith("}")) {
+            receivedData += JSON.parse(receivedLine).message.content;
+          }
+        });
+    } else {
+      if (receivedText.startsWith("{") && receivedText.endsWith("}")) {
+        receivedData += JSON.parse(receivedText).message.content;
+      }
+    }
   }
+  return removeCodeFormatting(receivedData);
 }
 
 function removeCodeFormatting(code: string): string {
   return code.replace(/```(?:typescript|javascript|tsx)?\n([\s\S]*?)```/g, '$1').trim();
+}
+
+async function getApiFetchModelsUrl() {
+  const baseUrl = await getBaseUrl();
+  return `${baseUrl}/api/fetchModels`;
+}
+
+async function getApiGenerateUrl() {
+  const baseUrl = await getBaseUrl();
+  return `${baseUrl}/api/generate`;
+}
+
+async function getBaseUrl() {
+  // During SSR, use the host header to create the base URL
+  if (typeof window === 'undefined') {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    // Cast to Headers since we know it's synchronous despite the type
+    const headersList = await headers() as Headers;
+    const host = headersList.get('host');
+    if (!host) {
+      // Fallback to environment variable or default
+      return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    }
+    return `${protocol}://${host}`;
+  }
+  // In the browser, use the current window location
+  return window.location.origin;
 }

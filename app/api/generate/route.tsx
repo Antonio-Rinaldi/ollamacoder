@@ -22,14 +22,14 @@ export async function POST(req: Request) {
 
   let { model, messages } = result.data;
 
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       model: model,
-      prompt: messages[0].content,
+      messages: messages,
       stream: true,
     }),
   });

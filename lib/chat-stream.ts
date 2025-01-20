@@ -1,28 +1,31 @@
-export class OllamaStream {
+export class ChatStream {
   static fromReadableStream(stream: ReadableStream) {
-    return new OllamaEventSource(stream);
+    return new ChatEventSource(stream);
   }
 }
 
-class OllamaEventSource {
+class ChatEventSource {
   private reader: ReadableStreamDefaultReader;
   private readonly events: {
     content: (delta: string, content: string) => void;
     finalContent: (content: string) => void;
   };
-  
+
   constructor(stream: ReadableStream) {
     this.reader = stream.getReader();
     this.events = {
       content: () => {},
-      finalContent: () => {}
+      finalContent: () => {},
     };
   }
 
   on(event: 'content' | 'finalContent', handler: any) {
     this.events[event] = handler;
-    if (event === 'content') this.startReading();
     return this;
+  }
+
+  async read() {
+      return this.startReading()
   }
 
   private async startReading() {
@@ -37,7 +40,8 @@ class OllamaEventSource {
         
         const chunk = new TextDecoder().decode(value);
         const lines = chunk.split('\n').filter(line => line.trim());
-        
+
+        const errors = [];
         for (const line of lines) {
           try {
             const data = JSON.parse(line);
@@ -49,13 +53,17 @@ class OllamaEventSource {
             fullContent += delta;
             this.events.content(delta, fullContent);
           } catch (error) {
-            console.error('Error parsing stream data:', error);
+            errors.push(error);
+          }
+
+          if (errors.length > 0) {
+            throw new Error('Error parsing stream data:\n' + errors.join('\n'));
           }
         }
       }
     } catch (error) {
-      console.error('Error reading stream:', error);
       this.events.finalContent(fullContent); // Ensure we still get the content we have
+      throw error;
     }
   }
 }
