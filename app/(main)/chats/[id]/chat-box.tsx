@@ -45,12 +45,11 @@ export default function ChatBox({
             assert.ok(typeof prompt === "string");
 
             const message = await createMessage(chat.id, prompt, "user");
-            const { streamPromise } = await getNextCompletionStreamPromise(
+            const streamPromise = getNextCompletionStreamPromise(
               message.id,
               chat.model,
             );
             onNewStreamPromise(streamPromise);
-
             router.refresh();
           });
         }}

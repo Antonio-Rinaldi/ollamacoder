@@ -175,7 +175,7 @@ export async function createMessage(
 export async function getNextCompletionStreamPromise(
   messageId: string,
   model: string,
-) {
+): Promise<ReadableStream> {
   const message = await prisma.message.findUnique({ where: { id: messageId } });
   if (!message) notFound();
 
@@ -193,8 +193,7 @@ export async function getNextCompletionStreamPromise(
     )
     .parse(messagesRes);
 
-  return {
-    streamPromise: new Promise<ReadableStream>(async (resolve, reject) => {
+  return new Promise<ReadableStream>(async (resolve, reject) => {
       try {
         const res = await fetch(await getApiGenerateUrl(), {
           method: "POST",
@@ -209,13 +208,12 @@ export async function getNextCompletionStreamPromise(
             })),
           }),
         });
-        resolve(res);
+        resolve(res.body as ReadableStream);
       } catch (error) {
         console.log(error)
         reject(error);
       }
-    }),
-  };
+    });
 }
 
 async function processResponse(res: Response) {

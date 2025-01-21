@@ -118,7 +118,7 @@ export default function Home() {
                   quality,
                   screenshotUrl,
                 );
-                const { streamPromise } = await getNextCompletionStreamPromise(
+                const streamPromise = getNextCompletionStreamPromise(
                   lastMessageId,
                   model,
                 );
