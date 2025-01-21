@@ -49,7 +49,7 @@ class ChatEventSource {
               this.events.finalContent(fullContent);
               return;
             }
-            const delta = data.response;
+            const delta = data.message.content;
             fullContent += delta;
             this.events.content(delta, fullContent);
           } catch (error) {
