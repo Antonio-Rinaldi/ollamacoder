@@ -14,10 +14,12 @@ export function ModelSelector({
   currentModel,
   chatId,
   onModelChange,
+  disabled,
 }: {
   currentModel: string;
   chatId: string;
   onModelChange: (model: string) => void;
+  disabled?: boolean;
 }) {
   const [models, setModels] = useState<Model[]>([]);
   const [model, setModel] = useState(currentModel);
@@ -46,7 +48,7 @@ export function ModelSelector({
   };
 
   return (
-    <Select.Root name="model" value={model} onValueChange={handleModelChange}>
+    <Select.Root name="model" value={model} onValueChange={handleModelChange} disabled={disabled}>
       <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300">
         <Select.Value aria-label={selectedModel?.label || ''}>
           <span>{selectedModel?.label || 'Select model'}</span>

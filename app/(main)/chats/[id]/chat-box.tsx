@@ -134,6 +134,7 @@ export default function ChatBox({
                 <ModelSelector
                   currentModel={chat.model}
                   chatId={chat.id}
+                  disabled={disabled}
                   onModelChange={(model) => {
                     router.refresh();
                   }}
