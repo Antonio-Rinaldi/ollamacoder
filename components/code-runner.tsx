@@ -1,8 +1,19 @@
-import { runJavaScriptCode, runPythonCode } from "@/components/code-runner-actions";
+import {
+  runJavaScriptCode,
+  runPythonCode,
+} from "@/components/code-runner-actions";
 import CodeRunnerServerAction from "@/components/code-runner-server-action";
 import CodeRunnerReact from "./code-runner-react";
 
-export default function CodeRunner({ language, code, }: { language: string; code: string; }) {
+export default function CodeRunner({
+                                     language,
+                                     code,
+                                   }: {
+  language: string;
+  code: string;
+}) {
+  return <CodeRunnerReact code={code} />;
+
   return (
     <>
       {language === "python" ? (
