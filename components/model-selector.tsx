@@ -49,7 +49,9 @@ export function ModelSelector({
 
   return (
     <Select.Root name="model" value={model} onValueChange={handleModelChange} disabled={disabled}>
-      <Select.Trigger className="inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300">
+      <Select.Trigger className={`inline-flex items-center gap-1 rounded-md p-1 text-sm text-gray-400 ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 hover:text-gray-700'
+      } focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300`}>
         <Select.Value aria-label={selectedModel?.label || ''}>
           <span>{selectedModel?.label || 'Select model'}</span>
         </Select.Value>

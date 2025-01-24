@@ -36,6 +36,7 @@ export default function ChatBox({
   const { uploadToS3 } = useS3Upload();
 
   const handleScreenshotUpload = async (event: any) => {
+    if (disabled) return;
     setQuality("low");
     setScreenshotLoading(true);
     let file = event.target.files[0];
@@ -141,13 +142,15 @@ export default function ChatBox({
                 />
 
                 <div className="h-4 w-px bg-gray-200 max-sm:hidden" />
-
-                <Select.Root
-                  name="quality"
-                  value={quality}
-                  onValueChange={setQuality}
-                >
-                  <Select.Trigger className="inline-flex items-center gap-1 rounded p-1 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300">
+<Select.Root
+  name="quality"
+  value={quality}
+  onValueChange={setQuality}
+  disabled={disabled}
+>
+  <Select.Trigger className={`inline-flex items-center gap-1 rounded p-1 text-sm text-gray-400 ${
+    disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 hover:text-gray-700'
+  } focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300`}>
                     <Select.Value aria-label={quality}>
                       <span className="max-sm:hidden">
                         {quality === "low"
@@ -192,12 +195,16 @@ export default function ChatBox({
                 <div>
                   <label
                     htmlFor="screenshot"
-                    className="flex cursor-pointer gap-2 text-sm text-gray-400 hover:underline"
+                    className={`flex gap-2 text-sm text-gray-400 ${
+                      disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:underline hover:text-gray-700'
+                    }`}
                   >
-                    <div className="flex size-6 items-center justify-center rounded bg-black hover:bg-gray-700">
+                    <div className={`flex size-6 items-center justify-center rounded ${
+                      disabled ? 'bg-black' : 'bg-black hover:bg-gray-700'
+                    }`}>
                       <UploadIcon className="size-4" />
                     </div>
-                    <div className="flex items-center justify-center transition hover:text-gray-700">
+                    <div className={`flex items-center justify-center transition ${disabled ? '' : 'hover:text-gray-700'}`}>
                       Attach
                     </div>
                   </label>
@@ -208,6 +215,7 @@ export default function ChatBox({
                     onChange={handleScreenshotUpload}
                     className="hidden"
                     ref={fileInputRef}
+                    disabled={disabled}
                   />
                 </div>
               </div>
