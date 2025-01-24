@@ -24,95 +24,9 @@ export async function createChat(
   screenshotUrl: string | undefined,
 ) {
 
-  async function fetchTitle() {
-    const title = await fetch(await getApiGenerateUrl() , {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a naming expert helping to create descriptive and meaningful titles for software projects. Your task is to analyze the user's prompt and create a clear, concise title that captures the essence of what they want to build. The title should be descriptive enough to understand the project's purpose but still concise (under 60 characters). Focus on the main functionality or purpose. Return only the title, with no quotes or additional text.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
-    });
-    return await processResponse(title) || prompt;
-  }
-
-  const [title] = await Promise.all([
-    fetchTitle(),
-  ]);
-
-  let fullScreenshotDescription: string | undefined;
-  if (screenshotUrl) {
-    const screenshotResponse = await fetch(await getApiGenerateUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: screenshotToCodePrompt },
-              {
-                type: "image_url",
-                image_url: {
-                  url: screenshotUrl,
-                },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-    fullScreenshotDescription = await processResponse(screenshotResponse);
-  }
-
-  let userMessage: string;
-  if (quality === "high") {
-    const initialRes = await fetch(await getApiGenerateUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        max_tokens: 3000,
-        messages: [
-          {
-            role: "system",
-            content: softwareArchitectPrompt,
-          },
-          {
-            role: "user",
-            content: fullScreenshotDescription
-              ? fullScreenshotDescription + prompt
-              : prompt,
-          },
-        ],
-      }),
-    });
-    userMessage = await processResponse(initialRes) ?? prompt;
-  } else {
-    userMessage =
-      prompt +
-      (fullScreenshotDescription ? "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " + fullScreenshotDescription : "");
-  }
+  const title = await fetchTitle(prompt, model);
+  const fullScreenshotDescription = await fetchFullScreenshotDescription(prompt, model, screenshotUrl)
+  const userMessage = await buildUserMessage(prompt, model, quality, fullScreenshotDescription)
 
   const chat = await prisma.chat.create({
     data: {
@@ -148,6 +62,95 @@ export async function createChat(
     chatId: chat['id'],
     lastMessageId: lastMessage.id,
   };
+}
+
+async function fetchTitle(prompt, model) {
+  const title = await fetch(await getApiGenerateUrl() , {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a naming expert helping to create descriptive and meaningful titles for software projects. Your task is to analyze the user's prompt and create a clear, concise title that captures the essence of what they want to build. The title should be descriptive enough to understand the project's purpose but still concise (under 60 characters). Focus on the main functionality or purpose. Return only the title, with no quotes or additional text.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }),
+  });
+  return await processResponse(title) || prompt;
+}
+
+async function fetchFullScreenshotDescription(prompt, model, screenshotUrl) {
+  if (!screenshotUrl) {
+    return undefined;
+  }
+  const screenshotResponse = await fetch(await getApiGenerateUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      max_tokens: 1000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: screenshotToCodePrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: screenshotUrl,
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  return processResponse(screenshotResponse);
+}
+
+async function buildUserMessage(prompt, model, quality, fullScreenshotDescription): Promise<String> {
+  if(quality !== "high") {
+    const screenshotUserMessagePart = fullScreenshotDescription
+      ? "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " + fullScreenshotDescription
+      : ""
+    return prompt + "\n" + screenshotUserMessagePart;
+  }
+  const initialRes = await fetch(await getApiGenerateUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      max_tokens: 3000,
+      messages: [
+        {
+          role: "system",
+          content: softwareArchitectPrompt,
+        },
+        {
+          role: "user",
+          content: fullScreenshotDescription
+            ? prompt + "\n" + fullScreenshotDescription
+            : prompt,
+        },
+      ],
+    }),
+  });
+  return processResponse(initialRes) ?? prompt;
 }
 
 export async function createMessage(

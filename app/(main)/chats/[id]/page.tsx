@@ -17,7 +17,7 @@ export default async function Page({
 }
 
 const getChatById = cache(async (id: string) => {
-  return await client.chat.findFirst({
+  return client.chat.findFirst({
     where: { id },
     include: { messages: { orderBy: { position: "asc" } } },
   });

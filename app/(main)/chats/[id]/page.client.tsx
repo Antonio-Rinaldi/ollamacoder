@@ -38,11 +38,10 @@ export default function PageClient({ chat }: { chat: Chat }) {
       isHandlingStreamRef.current = true;
       context.setStreamPromise(undefined);
 
-      const stream = await streamPromise;
       let didPushToCode = false;
       let didPushToPreview = false;
 
-      return ChatStream.fromReadableStream(stream)
+      return ChatStream.fromReadableStream(await streamPromise)
         .on("content", (delta: string, content: string) => {
           setStreamText((text) => text + delta);
 
