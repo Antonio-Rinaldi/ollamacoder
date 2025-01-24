@@ -8,6 +8,7 @@ import { useEffect, useRef, useTransition } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { createMessage, getNextCompletionStreamPromise } from "../../actions";
 import { type Chat } from "./page";
+import { ModelSelector } from "@/components/model-selector";
 
 export default function ChatBox({
   chat,
@@ -36,7 +37,7 @@ export default function ChatBox({
   }, [disabled]);
 
   return (
-    <div className="mx-auto mb-5 flex w-full max-w-prose shrink-0 px-8">
+    <div className="mx-auto mb-5 flex w-full max-w-prose shrink-0 flex-col px-8">
       <form
         className="relative flex w-full"
         action={async (formData) => {
@@ -91,6 +92,17 @@ export default function ChatBox({
           </div>
         </fieldset>
       </form>
+      <div className="mt-2 flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <ModelSelector
+            currentModel={chat.model}
+            chatId={chat.id}
+            onModelChange={(model) => {
+              router.refresh();
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
