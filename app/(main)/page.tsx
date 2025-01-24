@@ -333,6 +333,12 @@ export default function Home() {
               </div>
             </Fieldset>
           </form>
+          <Link
+            href="/chats"
+            className="mt-6 inline-flex items-center rounded-full border-[0.5px] bg-white px-5 py-2 text-sm text-gray-800 shadow-[0px_1px_1px_0px_rgba(0,0,0,0.15)] transition-colors hover:bg-gray-50"
+          >
+            Existing Chats
+          </Link>
         </div>
 
         <footer className="flex w-full flex-col items-center justify-between space-y-3 px-3 pb-3 pt-5 text-center sm:flex-row sm:pt-2">
