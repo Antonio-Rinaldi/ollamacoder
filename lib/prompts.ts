@@ -1,6 +1,5 @@
 import dedent from "dedent";
 import shadcnDocs from "./shadcn-docs";
-import { examples } from "./shadcn-examples";
 
 export const softwareArchitectPrompt = dedent`
 You are an expert software architect and product lead responsible for taking an idea of an app, analyzing it, and producing an implementation plan for a single page React frontend app. You are describing a plan for a single component React + Tailwind CSS + TypeScript app with the ability to use Lucide React for icons and Shadcn UI for components.
@@ -91,16 +90,6 @@ export function getMainCodingPrompt() {
   NO OTHER LIBRARIES ARE INSTALLED OR ABLE TO BE IMPORTED (such as zod, hookform, react-router) BESIDES THOSE SPECIFIED ABOVE.
 
   Explain your work. The first codefence should be the main React component. It should also use "tsx" as the language, and be followed by a sensible filename for the code (please use kebab-case for file names). Use this format: \`\`\`tsx{filename=calculator.tsx}.
-
-  # Examples
-
-  Here's a good example:
-
-  Prompt:
-  ${examples["calculator app"].prompt}
-
-  Response:
-  ${examples["calculator app"].response}
   `;
   return dedent(systemPrompt);
 }

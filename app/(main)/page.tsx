@@ -91,8 +91,6 @@ export default function Home() {
           >
             <span className="text-center">
               Powered by <span className="font-semibold">Ollama</span>.
-              Used by
-              <span className="font-semibold"> some unlucky guy. </span>
             </span>
           </a>
 
@@ -398,7 +396,7 @@ function LoadingMessage({
       <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
         <span className="animate-pulse text-balance text-center text-sm md:text-base">
           {isHighQuality
-            ? `Coming up with project plan, may take 15 seconds...`
+            ? `Coming up with project plan...`
             : screenshotUrl
               ? "Analyzing your screenshot..."
               : `Creating your app...`}

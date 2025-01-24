@@ -13,7 +13,6 @@ import CodeViewer from "./code-viewer";
 import CodeViewerLayout from "./code-viewer-layout";
 import type { Chat } from "./page";
 import { Context } from "../../providers";
-import { ModelSelector } from "@/components/model-selector";
 
 export default function PageClient({ chat }: { chat: Chat }) {
   const context = use(Context);

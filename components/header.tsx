@@ -29,9 +29,6 @@ export default function Header() {
           </a>
         </div>
       </header>
-      <Link href="/chats" className="mt-2 text-sm text-gray-600 hover:text-gray-900">
-        Existing Chats
-      </Link>
     </div>
   );
 }

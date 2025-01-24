@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       model: model,
       messages: messages,
       stream: true,
+      context_length: 16384,  // Set 16K context window
     }),
   });
 
