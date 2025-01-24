@@ -94,11 +94,14 @@ export default function PageClient({ chat }: { chat: Chat }) {
     <div className="h-dvh">
       <div className="flex h-full">
         <div className="mx-auto flex w-full shrink-0 flex-col overflow-hidden lg:w-1/2">
-          <div className="flex items-center gap-4 px-4 py-4">
-            <Link href="/">
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+            <Link href="/" className="flex-shrink-0">
               <LogoSmall />
             </Link>
-            <p className="italic text-gray-500">{chat['title']}</p>
+            <h1 className="text-xl font-medium text-gray-800 text-center flex-grow mx-4 truncate">
+              {chat['title']}
+            </h1>
+            <div className="flex-shrink-0 w-8"></div>
           </div>
 
           <ChatLog
