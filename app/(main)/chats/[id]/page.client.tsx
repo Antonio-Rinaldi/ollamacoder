@@ -16,9 +16,7 @@ import { Context } from "../../providers";
 
 export default function PageClient({ chat }: { chat: Chat }) {
   const context = use(Context);
-  const [streamPromise, setStreamPromise] = useState<
-    Promise<ReadableStream> | undefined
-  >(context.streamPromise);
+  const [readableStream, setReadableStream] = useState<ReadableStream<Uint8Array> | undefined>(context.readableStream);
   const [streamText, setStreamText] = useState("");
   const [isShowingCodeViewer, setIsShowingCodeViewer] = useState(
     chat['messages'].some(message => message.role === "assistant") as boolean,
@@ -33,15 +31,15 @@ export default function PageClient({ chat }: { chat: Chat }) {
   const chatId = chat['id'];
   useEffect(() => {
     (async () => {
-      if (!streamPromise || isHandlingStreamRef.current) return;
+      if (!readableStream || isHandlingStreamRef.current) return;
 
       isHandlingStreamRef.current = true;
-      context.setStreamPromise(undefined);
+      context.setReadableStream(undefined);
 
       let didPushToCode = false;
       let didPushToPreview = false;
 
-      return ChatStream.fromReadableStream(await streamPromise)
+      return ChatStream.fromReadableStream<>(readableStream)
         .on("content", (delta: string, content: string) => {
           setStreamText((text) => text + delta);
 
@@ -78,7 +76,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
             startTransition(() => {
               isHandlingStreamRef.current = false;
               setStreamText("");
-              setStreamPromise(undefined);
+              setReadableStream(undefined);
               setActiveMessage(message);
               router.refresh();
             });
@@ -86,7 +84,7 @@ export default function PageClient({ chat }: { chat: Chat }) {
         })
         .read();
     })();
-  }, [chatId, router, streamPromise, context]);
+  }, [chatId, router, readableStream, context]);
 
   return (
     <div className="h-dvh">
@@ -119,8 +117,8 @@ export default function PageClient({ chat }: { chat: Chat }) {
 
           <ChatBox
             chat={chat}
-            onNewStreamPromise={setStreamPromise}
-            isStreaming={!!streamPromise}
+            setReadableStream={setReadableStream}
+            isStreaming={!!readableStream}
           />
         </div>
 

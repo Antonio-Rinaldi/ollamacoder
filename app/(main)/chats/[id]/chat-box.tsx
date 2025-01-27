@@ -17,39 +17,30 @@ import { useS3Upload } from "next-s3-upload";
 
 export default function ChatBox({
   chat,
-  onNewStreamPromise,
+  setReadableStream,
   isStreaming,
 }: {
   chat: Chat;
-  onNewStreamPromise: (v: Promise<ReadableStream>) => void;
+  setReadableStream: (f: ReadableStream<Uint8Array> | undefined) => void;
   isStreaming: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const disabled = isPending || isStreaming;
   const didFocusOnce = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement >(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [quality, setQuality] = useState("high");
   const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(undefined);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const { uploadToS3 } = useS3Upload();
 
-  const handleScreenshotUpload = async (event: any) => {
-    if (disabled) return;
-    setQuality("low");
-    setScreenshotLoading(true);
-    let file = event.target.files[0];
-    const { url } = await uploadToS3(file);
-    setScreenshotUrl(url);
-    setScreenshotLoading(false);
-  };
-
   useEffect(() => {
     if (!textareaRef.current) return;
-
     if (!disabled && !didFocusOnce.current) {
-      textareaRef.current.focus();
+      if ("focus" in textareaRef.current) {
+        textareaRef.current.focus();
+      }
       didFocusOnce.current = true;
     } else {
       didFocusOnce.current = false;
@@ -60,21 +51,7 @@ export default function ChatBox({
     <div className="mx-auto mb-5 flex w-full max-w-prose shrink-0 flex-col px-8">
       <form
         className="relative flex w-full"
-        action={async (formData) => {
-          startTransition(async () => {
-            const { prompt, quality } = Object.fromEntries(formData);
-            assert.ok(typeof prompt === "string");
-            assert.ok(quality === "high" || quality === "low");
-
-            const message = await createMessage(chat.id, prompt, "user");
-            const streamPromise = getNextCompletionStreamPromise(
-              message.id,
-              chat.model,
-            );
-            onNewStreamPromise(streamPromise);
-            router.refresh();
-          });
-        }}
+        action={async formData => processUserForm(formData, chat)}
       >
         <fieldset className="w-full" disabled={disabled}>
           <div className="relative flex rounded-xl border-4 border-gray-300 bg-white pb-10">
@@ -82,7 +59,8 @@ export default function ChatBox({
               {screenshotLoading && (
                 <div className="relative mx-3 mt-3">
                   <div className="rounded-xl">
-                    <div className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-gray-200">
+                    <div
+                      className="group mb-2 flex h-16 w-[68px] animate-pulse items-center justify-center rounded bg-gray-200">
                       <Spinner />
                     </div>
                   </div>
@@ -104,7 +82,9 @@ export default function ChatBox({
                     onClick={() => {
                       setScreenshotUrl(undefined);
                       if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
+                        if ("value" in fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
                       }
                     }}
                   >
@@ -133,33 +113,31 @@ export default function ChatBox({
             <div className="absolute bottom-2 left-2 right-2.5 flex items-center justify-between flex-nowrap">
               <div className="flex items-center gap-2 flex-nowrap">
                 <ModelSelector
-                  currentModel={chat.model}
-                  chatId={chat.id}
+                  currentModel={chat['model']}
+                  chatId={chat['id']}
                   disabled={disabled}
-                  onModelChange={(model) => {
-                    router.refresh();
-                  }}
+                  onModelChange={router.refresh}
                 />
 
                 <div className="h-4 w-px bg-gray-200 max-sm:hidden" />
-<Select.Root
-  name="quality"
-  value={quality}
-  onValueChange={setQuality}
-  disabled={disabled}
->
-  <Select.Trigger className={`inline-flex items-center gap-1 rounded p-1 text-sm text-gray-400 ${
-    disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 hover:text-gray-700'
-  } focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300`}>
+                <Select.Root
+                  name="quality"
+                  value={quality}
+                  onValueChange={setQuality}
+                  disabled={disabled}
+                >
+                  <Select.Trigger className={`inline-flex items-center gap-1 rounded p-1 text-sm text-gray-400 ${
+                    disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 hover:text-gray-700'
+                  } focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-300`}>
                     <Select.Value aria-label={quality}>
-                      <span className="max-sm:hidden">
-                        {quality === "low"
-                          ? "Low quality [faster]"
-                          : "High quality [slower]"}
-                      </span>
+                                        <span className="max-sm:hidden">
+                                          {quality === "low"
+                                            ? "Low quality [faster]"
+                                            : "High quality [slower]"}
+                                        </span>
                       <span className="sm:hidden">
-                        <LightningBoltIcon className="size-3" />
-                      </span>
+                                          <LightningBoltIcon className="size-3" />
+                                        </span>
                     </Select.Value>
                     <Select.Icon>
                       <ChevronDownIcon className="size-3" />
@@ -189,7 +167,6 @@ export default function ChatBox({
                     </Select.Content>
                   </Select.Portal>
                 </Select.Root>
-
                 <div className="h-4 w-px bg-gray-200 max-sm:hidden" />
 
                 <div>
@@ -204,7 +181,8 @@ export default function ChatBox({
                     }`}>
                       <UploadIcon className="size-4" />
                     </div>
-                    <div className={`flex items-center justify-center transition ${disabled ? '' : 'hover:text-gray-700'}`}>
+                    <div
+                      className={`flex items-center justify-center transition ${disabled ? '' : 'hover:text-gray-700'}`}>
                       Attach
                     </div>
                   </label>
@@ -237,4 +215,27 @@ export default function ChatBox({
       </form>
     </div>
   );
+
+  async function handleScreenshotUpload(event: any) {
+    if (disabled) return;
+    setQuality("low");
+    setScreenshotLoading(true);
+    let file = event.target.files[0];
+    const { url } = await uploadToS3(file);
+    setScreenshotUrl(url);
+    setScreenshotLoading(false);
+  }
+
+  async function processUserForm(formData, chat) {
+    const { prompt, quality } = Object.fromEntries(formData);
+    assert.ok(typeof prompt === "string");
+    assert.ok(quality === "high" || quality === "low");
+
+    const message = await createMessage(chat.id, prompt, "user");
+    const readableStream = await getNextCompletionStreamPromise(message['id'], chat.model);
+    setReadableStream(readableStream);
+    router.refresh();
+  }
 }
+
+

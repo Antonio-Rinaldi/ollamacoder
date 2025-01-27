@@ -3,16 +3,16 @@
 import { createContext, ReactNode, useState } from "react";
 
 export const Context = createContext<{
-  streamPromise?: Promise<ReadableStream>;
-  setStreamPromise: (v: Promise<ReadableStream> | undefined) => void;
+  readableStream?: ReadableStream<Uint8Array>;
+  setReadableStream: (v: ReadableStream<Uint8Array> | undefined) => void;
 }>({
-  setStreamPromise: () => {},
+  setReadableStream: () => {},
 });
 
 export default function Providers({ children }: { children: ReactNode }) {
-  const [streamPromise, setStreamPromise] = useState<Promise<ReadableStream>>();
+  const [readableStream, setReadableStream] = useState<ReadableStream<Uint8Array>>();
 
   return (
-    <Context.Provider value={{ streamPromise, setStreamPromise }}>{children}</Context.Provider>
+    <Context.Provider value={{ readableStream, setReadableStream }}>{children}</Context.Provider>
   );
 }

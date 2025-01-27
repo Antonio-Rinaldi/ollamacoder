@@ -6,6 +6,23 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getMainCodingPrompt, screenshotToCodePrompt, softwareArchitectPrompt } from "@/lib/prompts";
 
+interface ChatResponse {
+  id: string;
+  model: string;
+  quality: string;
+  prompt: string;
+  title: string;
+  ollamaCoderVersion: string;
+  shadcn: boolean;
+  createdAt: Date;
+  messages: Array<{
+    id: string;
+    role: string;
+    content: string;
+    position: number;
+  }>;
+}
+
 export async function fetchModels() {
   const res = await fetch(await getApiFetchModelsUrl(), {
     method: "GET",
@@ -17,54 +34,133 @@ export async function fetchModels() {
   }));
 }
 
-export async function createChat(
+export async function initChat(
   prompt: string,
   model: string,
   quality: "high" | "low",
   screenshotUrl: string | undefined,
 ) {
-
   const title = await fetchTitle(prompt, model);
-  const fullScreenshotDescription = await fetchFullScreenshotDescription(prompt, model, screenshotUrl)
-  const userMessage = await buildUserMessage(prompt, model, quality, fullScreenshotDescription)
-
-  const chat = await prisma.chat.create({
-    data: {
-      model,
-      quality,
-      prompt,
-      title,
-      shadcn: true,
-      messages: {
-        createMany: {
-          data: [
-            {
-              role: "system",
-              content: getMainCodingPrompt(),
-              position: 0,
-            },
-            { role: "user", content: userMessage, position: 1 },
-          ],
-        },
-      },
-    },
-    include: {
-      messages: true,
-    },
-  });
+  const fullScreenshotDescription: string | undefined = await fetchFullScreenshotDescription(prompt, model, screenshotUrl)
+  const userMessage: string = await buildUserMessage(prompt, model, quality, fullScreenshotDescription)
+  const chat: ChatResponse = await createChat(prompt, model, quality, title, userMessage)
 
   const lastMessage = chat.messages
     .sort((a, b) => a.position - b.position)
     .at(-1);
   if (!lastMessage) throw new Error("No new message");
-
   return {
-    chatId: chat['id'],
+    chatId: chat.id,
     lastMessageId: lastMessage.id,
   };
 }
 
-async function fetchTitle(prompt, model) {
+export async function createMessage(
+  chatId: string,
+  text: string,
+  role: "assistant" | "user",
+) {
+  const chat = await prisma.chat.findUnique({
+    where: { id: chatId },
+    include: { messages: true },
+  });
+  if (!chat) notFound();
+
+  const maxPosition = Math.max(...chat.messages.map(message => message.position));
+  return prisma.message.create({
+    data: {
+      role,
+      content: text,
+      position: maxPosition + 1,
+      chatId,
+    },
+  });
+}
+
+// This is used for subsequent messages in the chat
+export async function getNextCompletionStreamPromise(
+  messageId: string,
+  model: string,
+): Promise<ReadableStream<Uint8Array>> {
+  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!message) notFound();
+
+  const messagesRes = await prisma.message.findMany({
+    where: { chatId: message['chatId'], position: { lte: message['position'] } },
+    orderBy: { position: "asc" }
+  });
+
+  const messages = z
+    .array(
+      z.object({
+        role: z.enum(["system", "user", "assistant"]),
+        content: z.string(),
+      }),
+    )
+    .parse(messagesRes);
+
+  return new Promise<ReadableStream<Uint8Array>>(async (resolve, reject) => {
+    const res = await fetch(await getApiGenerateUrl(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: messages.map(message => ({
+          role: message.role,
+          content: message.content
+        })),
+        temperature: 0.2,
+        max_tokens: 9000,
+      }),
+    });
+    if (!res.ok) {
+      reject(`Failed to get completion for messageId ${messageId}, error is: ${res.statusText}.`);
+    }
+    if (!res.body) {
+      reject(`No response body for messageId ${messageId}.`)
+    }
+     resolve(res.body);
+  });
+}
+
+export async function processResponse(res: Response) {
+  if (!res.ok) {
+    throw Error(`Failed to get completion: ${res.statusText}`);
+  }
+  if (!res.body) {
+    throw Error("No response body");
+  }
+  return processResponseBody(res.body)
+}
+
+export async function processResponseBody(resBody: ReadableStream<Uint8Array>) {
+  const reader = resBody.getReader();
+  let receivedData = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const receivedText = new TextDecoder().decode(value);
+    if (receivedText.includes("\n")) {
+      receivedText.split("\n")
+        .forEach(receivedLine => {
+          if (receivedLine.startsWith("{") && receivedLine.endsWith("}")) {
+            receivedData += JSON.parse(receivedLine).message.content;
+          }
+        });
+    } else {
+      if (receivedText.startsWith("{") && receivedText.endsWith("}")) {
+        receivedData += JSON.parse(receivedText).message.content;
+      }
+    }
+  }
+  return removeCodeFormatting(receivedData);
+}
+
+async function fetchTitle(prompt: string, model: string): Promise<string> {
   const title = await fetch(await getApiGenerateUrl() , {
     method: "POST",
     headers: {
@@ -88,7 +184,11 @@ async function fetchTitle(prompt, model) {
   return await processResponse(title) || prompt;
 }
 
-async function fetchFullScreenshotDescription(prompt, model, screenshotUrl) {
+async function fetchFullScreenshotDescription(
+  prompt: string,
+  model: string,
+  screenshotUrl: string | undefined
+): Promise<string | undefined> {
   if (!screenshotUrl) {
     return undefined;
   }
@@ -117,10 +217,15 @@ async function fetchFullScreenshotDescription(prompt, model, screenshotUrl) {
       ],
     }),
   });
-  return processResponse(screenshotResponse);
+  return await processResponse(screenshotResponse);
 }
 
-async function buildUserMessage(prompt, model, quality, fullScreenshotDescription): Promise<String> {
+async function buildUserMessage(
+  prompt: string,
+  model: string,
+  quality: "high" | "low",
+  fullScreenshotDescription: string | undefined
+): Promise<string> {
   if(quality !== "high") {
     const screenshotUserMessagePart = fullScreenshotDescription
       ? "RECREATE THIS APP AS CLOSELY AS POSSIBLE: " + fullScreenshotDescription
@@ -150,106 +255,34 @@ async function buildUserMessage(prompt, model, quality, fullScreenshotDescriptio
       ],
     }),
   });
-  return processResponse(initialRes) ?? prompt;
+  return await processResponse(initialRes) ?? prompt;
 }
 
-export async function createMessage(
-  chatId: string,
-  text: string,
-  role: "assistant" | "user",
-) {
-  const chat = await prisma.chat.findUnique({
-    where: { id: chatId },
-    include: { messages: true },
-  });
-  if (!chat) notFound();
-
-  const maxPosition = Math.max(...chat.messages.map(message => message.position));
-  return prisma.message.create({
+async function createChat(prompt, model, quality, title, userMessage): Promise<ChatResponse> {
+  return prisma.chat.create({
     data: {
-      role,
-      content: text,
-      position: maxPosition + 1,
-      chatId,
+      model,
+      quality,
+      prompt,
+      title,
+      shadcn: true,
+      messages: {
+        createMany: {
+          data: [
+            {
+              role: "system",
+              content: getMainCodingPrompt(),
+              position: 0,
+            },
+            { role: "user", content: userMessage, position: 1 },
+          ],
+        },
+      },
     },
-  });
-}
-
-export async function getNextCompletionStreamPromise(
-  messageId: string,
-  model: string,
-): Promise<ReadableStream> {
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) notFound();
-
-  const messagesRes = await prisma.message.findMany({
-    where: { chatId: message['chatId'], position: { lte: message['position'] } },
-    orderBy: { position: "asc" }
-  });
-
-  const messages = z
-    .array(
-      z.object({
-        role: z.enum(["system", "user", "assistant"]),
-        content: z.string(),
-      }),
-    )
-    .parse(messagesRes);
-
-  return new Promise<ReadableStream>(async (resolve, reject) => {
-      try {
-        const res = await fetch(await getApiGenerateUrl(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            messages: messages.map(message => ({
-              role: message.role,
-              content: message.content
-            })),
-          }),
-        });
-        resolve(res.body as ReadableStream);
-      } catch (error) {
-        console.log(error)
-        reject(error);
-      }
-    });
-}
-
-async function processResponse(res: Response) {
-  if (!res.ok) {
-    throw Error(res.statusText);
-  }
-
-  if (!res.body) {
-    throw Error("No response body");
-  }
-
-  const reader = res.body.getReader();
-  let receivedData = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
-    }
-    const receivedText = new TextDecoder().decode(value);
-    if (receivedText.includes("\n")) {
-      receivedText.split("\n")
-        .forEach(receivedLine => {
-          if (receivedLine.startsWith("{") && receivedLine.endsWith("}")) {
-            receivedData += JSON.parse(receivedLine).message.content;
-          }
-        });
-    } else {
-      if (receivedText.startsWith("{") && receivedText.endsWith("}")) {
-        receivedData += JSON.parse(receivedText).message.content;
-      }
-    }
-  }
-  return removeCodeFormatting(receivedData);
+    include: {
+      messages: true,
+    },
+  }) as ChatResponse;
 }
 
 function removeCodeFormatting(code: string): string {

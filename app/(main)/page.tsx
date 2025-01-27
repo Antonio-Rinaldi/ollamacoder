@@ -13,9 +13,9 @@ import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useState, useRef, useTransition, useEffect } from "react";
+import { use, useState, useRef, useTransition, useEffect, useContext } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { fetchModels, createChat, getNextCompletionStreamPromise } from "./actions";
+import { initChat, fetchModels, getNextCompletionStreamPromise, processResponse, processResponseBody } from "./actions";
 import { Context } from "./providers";
 import Header from "@/components/header";
 import { useS3Upload } from "next-s3-upload";
@@ -23,17 +23,15 @@ import UploadIcon from "@/components/icons/upload-icon";
 import { XCircleIcon } from "@heroicons/react/20/solid";
 import { SUGGESTED_PROMPTS } from "@/lib/constants";
 
+export interface Model {
+  label: string;
+  value: string;
+}
+
 export default function Home() {
-  const { setStreamPromise } = use(Context);
+  const { setReadableStream } = use(Context);
   const router = useRouter();
-
-  interface Model {
-    label: string;
-    value: string;
-  }
-
   const [models, setModels] = useState<Model[]>([]);
-
   useEffect(() => {
     (async () => {
       const models = await fetchModels()
@@ -55,19 +53,8 @@ export default function Home() {
   );
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [isPending, startTransition] = useTransition();
-
   const { uploadToS3 } = useS3Upload();
-  const handleScreenshotUpload = async (event: any) => {
-    if (prompt.length === 0) setPrompt("Build this");
-    setQuality("low");
-    setScreenshotLoading(true);
-    let file = event.target.files[0];
-    const { url } = await uploadToS3(file);
-    setScreenshotUrl(url);
-    setScreenshotLoading(false);
-  };
 
   return (
     <div className="relative flex grow flex-col">
@@ -102,30 +89,7 @@ export default function Home() {
 
           <form
             className="relative pt-6 lg:pt-12"
-            action={async formData => {
-              startTransition(async () => {
-                const { prompt, model, quality } = Object.fromEntries(formData);
-
-                assert.ok(typeof prompt === "string");
-                assert.ok(typeof model === "string");
-                assert.ok(quality === "high" || quality === "low");
-
-                const { chatId, lastMessageId } = await createChat(
-                  prompt,
-                  model,
-                  quality,
-                  screenshotUrl,
-                );
-                const streamPromise = getNextCompletionStreamPromise(
-                  lastMessageId,
-                  model,
-                );
-                startTransition(() => {
-                  setStreamPromise(streamPromise);
-                  router.push(`/chats/${chatId}`);
-                });
-              });
-            }}
+            action={async formData => processUserForm(formData)}
           >
             <Fieldset>
               <div className="relative flex rounded-xl border-4 border-gray-300 bg-white pb-10">
@@ -201,14 +165,14 @@ export default function Home() {
                       <Select.Portal>
                         <Select.Content className="overflow-hidden rounded-md bg-white shadow ring-1 ring-black/5">
                           <Select.Viewport className="space-y-1 p-2">
-                            {models.map(m => (
+                            {models.map(model => (
                               <Select.Item
-                                key={m.value}
-                                value={m.value}
+                                key={model.value}
+                                value={model.value}
                                 className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-100 data-[highlighted]:outline-none"
                               >
                                 <Select.ItemText className="inline-flex items-center gap-2 text-gray-500">
-                                  {m.label}
+                                  {model.label}
                                 </Select.ItemText>
                                 <Select.ItemIndicator>
                                   <CheckIcon className="size-3 text-blue-600" />
@@ -253,14 +217,14 @@ export default function Home() {
                                 value: "high",
                                 label: "High quality [slower]",
                               },
-                            ].map((q) => (
+                            ].map((quality) => (
                               <Select.Item
-                                key={q.value}
-                                value={q.value}
+                                key={quality.value}
+                                value={quality.value}
                                 className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-sm data-[highlighted]:bg-gray-100 data-[highlighted]:outline-none"
                               >
                                 <Select.ItemText className="inline-flex items-center gap-2 text-gray-500">
-                                  {q.label}
+                                  {quality.label}
                                 </Select.ItemText>
                                 <Select.ItemIndicator>
                                   <CheckIcon className="size-3 text-blue-600" />
@@ -287,7 +251,6 @@ export default function Home() {
                         </div>
                       </label>
                       <input
-                        // name="screenshot"
                         id="screenshot"
                         type="file"
                         accept="image/png, image/jpeg, image/webp"
@@ -311,10 +274,19 @@ export default function Home() {
                 </div>
 
                 {isPending && (
-                  <LoadingMessage
-                    isHighQuality={quality === "high"}
-                    screenshotUrl={screenshotUrl}
-                  />
+                  <div
+                    className="absolute inset-0 flex items-center justify-center rounded-xl bg-white px-1 py-3 md:px-3">
+                    <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
+                      <span className="animate-pulse text-balance text-center text-sm md:text-base">
+                        {quality === "high"
+                          ? `Coming up with project plan...`
+                          : screenshotUrl
+                            ? "Analyzing your screenshot..."
+                            : `Creating your app...`}
+                      </span>
+                      <Spinner />
+                    </div>
+                  </div>
                 )}
               </div>
               <div className="mt-4 flex w-full flex-wrap justify-center gap-3">
@@ -325,7 +297,7 @@ export default function Home() {
                     onClick={() => setPrompt(v.description)}
                     className="rounded bg-gray-200 px-2.5 py-1.5 text-xs hover:bg-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
                   >
-                    {v.title}
+                  {v.title}
                   </button>
                 ))}
               </div>
@@ -382,30 +354,33 @@ export default function Home() {
       </div>
     </div>
   );
-}
 
-function LoadingMessage({
-  isHighQuality,
-  screenshotUrl,
-}: {
-  isHighQuality: boolean;
-  screenshotUrl: string | undefined;
-}) {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white px-1 py-3 md:px-3">
-      <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
-        <span className="animate-pulse text-balance text-center text-sm md:text-base">
-          {isHighQuality
-            ? `Coming up with project plan...`
-            : screenshotUrl
-              ? "Analyzing your screenshot..."
-              : `Creating your app...`}
-        </span>
+   async function handleScreenshotUpload(event: any) {
+    if (prompt.length === 0) setPrompt("Build this");
+    setQuality("low");
+    setScreenshotLoading(true);
+    let file = event.target.files[0];
+    const { url } = await uploadToS3(file);
+    setScreenshotUrl(url);
+    setScreenshotLoading(false);
+  }
 
-        <Spinner />
-      </div>
-    </div>
-  );
+  async function processUserForm(formData: FormData) {
+     startTransition(async () => {
+       const { prompt, model, quality } = Object.fromEntries(formData);
+
+       assert.ok(typeof prompt === "string");
+       assert.ok(typeof model === "string");
+       assert.ok(quality === "high" || quality === "low");
+
+       const { chatId, lastMessageId } = await initChat(prompt, model, quality, screenshotUrl);
+       const readableStream = await getNextCompletionStreamPromise(lastMessageId, model);
+       startTransition( () => {
+         setReadableStream(readableStream)
+         router.push(`/chats/${chatId}`);
+       });
+     });
+    }
 }
 
 export const maxDuration = 45;
