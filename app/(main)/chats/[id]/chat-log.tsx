@@ -17,7 +17,7 @@ export default function ChatLog({
   streamText: string;
   onMessageClick: (v: Message) => void;
 }) {
-  const assistantMessages = chat.messages.filter((m) => m.role === "assistant");
+  const assistantMessages = chat["messages"].filter(message => message.role === "assistant");
 
   return (
     <StickToBottom
@@ -26,9 +26,9 @@ export default function ChatLog({
       initial="smooth"
     >
       <StickToBottom.Content className="mx-auto flex w-full max-w-prose flex-col gap-8 p-8">
-        <UserMessage content={chat.prompt} />
+        <UserMessage content={chat["prompt"]} />
 
-        {chat.messages.slice(2).map((message) => (
+        {chat["messages"].slice(2).map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
               <UserMessage content={message.content} />

@@ -100,7 +100,7 @@ export async function getNextCompletionStreamPromise(
     .parse(messagesRes);
 
   return new Promise<ReadableStream<Uint8Array>>(async (resolve, reject) => {
-    const res = await fetch(await getApiGenerateUrl(), {
+    const res: Response  = await fetch(await getApiGenerateUrl(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
